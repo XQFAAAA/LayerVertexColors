@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-A Blender addon for layered vertex color management, providing a material-independent vertex color slot system.
+The Blender layered vertex color management plug-in provides a vertex color slot system similar to materials.
 
 ## Features
 
