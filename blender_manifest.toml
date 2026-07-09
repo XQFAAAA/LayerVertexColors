@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "layer_vertex_colors"
+version = "1.0.0"
+name = "Layer Vertex Colors"
+tagline = "Layered vertex color management with independent color slot system"
+blender_version_min = "4.5.0"
+type = "add-on"
+
+license = ["SPDX:GPL-3.0-or-later"]
+website = "https://github.com/XQFAAAA/LayerVertexColors"
+
+[permissions]
+files = "Read/write mesh attribute data for vertex color slots"
