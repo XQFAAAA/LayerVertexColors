@@ -152,6 +152,13 @@ class FaceColorManager:
                 attr.data[i].value = b""
 
     @staticmethod
+    def ensure_attrs_for_object(obj):
+        """确保物体网格存在所有面颜色属性（对象模式）"""
+        if obj.type != 'MESH':
+            return
+        FaceColorManager.ensure_attrs_object(obj.data)
+
+    @staticmethod
     def ensure_attrs_edit(bm):
         """确保 bmesh 存在面颜色属性层（编辑模式）"""
         attr_slot = FaceColorManager.ATTR_SLOT
@@ -327,6 +334,7 @@ class FaceColorManager:
 
         if obj.mode == 'EDIT':
             bm = bmesh.from_edit_mesh(mesh)
+            FaceColorManager.ensure_attrs_edit(bm)
             slot_layer = bm.loops.layers.int.get(attr_slot)
             color_layer = bm.loops.layers.color.get(attr_color)
             if slot_layer is not None and color_layer is not None:
@@ -337,10 +345,9 @@ class FaceColorManager:
                             loop[color_layer] = srgb_color
                 bmesh.update_edit_mesh(mesh)
         else:
-            slot_attr = mesh.attributes.get(attr_slot)
-            color_attr = mesh.attributes.get(attr_color)
-            if slot_attr is None or color_attr is None:
-                return
+            FaceColorManager.ensure_attrs_object(mesh)
+            slot_attr = mesh.attributes[attr_slot]
+            color_attr = mesh.attributes[attr_color]
             for i in range(len(mesh.loops)):
                 if slot_attr.data[i].value == slot_idx:
                     color_attr.data[i].color = color
@@ -987,16 +994,26 @@ class LVC_OT_RebuildSlotData(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
+        objs = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        if objs:
+            return True
         obj = context.active_object
         return obj is not None and obj.type == 'MESH'
 
     def execute(self, context):
-        obj = context.active_object
-        needed = FaceColorManager.rebuild_from_mesh(obj)
+        objs = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        if not objs:
+            obj = context.active_object
+            if obj and obj.type == 'MESH':
+                objs = [obj]
+        total_needed = 0
+        for obj in objs:
+            FaceColorManager.ensure_attrs_for_object(obj)
+            total_needed += FaceColorManager.rebuild_from_mesh(obj)
         FaceColorManager.clear_conflict_cache()
         for area in context.screen.areas:
             area.tag_redraw()
-        self.report({'INFO'}, f"已重建槽位数据（共 {needed} 个槽位）")
+        self.report({'INFO'}, f"已为 {len(objs)} 个物体重建槽位数据（共 {total_needed} 个槽位）")
         return {'FINISHED'}
 
 
@@ -1433,7 +1450,6 @@ class LVC_MT_LayerVertexUtility(bpy.types.Menu):
         layout.operator(LVC_OT_SetByMaterial.bl_idname, icon='MATERIAL_DATA')
         layout.operator(LVC_OT_SetByLooseParts.bl_idname, icon='MOD_EXPLODE')
         layout.separator()
-        layout.operator(LVC_OT_RebuildSlotData.bl_idname, icon='FILE_REFRESH')
         layout.operator(LVC_OT_CleanupUnusedBalls.bl_idname, icon='BRUSH_DATA')
         layout.separator()
         layout.operator(LVC_OT_RemoveAllSlots.bl_idname, icon='TRASH')
@@ -1784,11 +1800,8 @@ class LVC_OT_ToggleVertexColorView(bpy.types.Operator):
             if hasattr(shading, 'color_type'):
                 shading.color_type = 'VERTEX'
             if obj and obj.type == 'MESH':
-                color_attr = obj.data.attributes.get(FaceColorManager.ATTR_COLOR)
-                if color_attr:
-                    obj.data.attributes.active_color = color_attr
-                else:
-                    self.report({'WARNING'}, "该物体没有 layer_vertex_color 属性")
+                FaceColorManager.ensure_attrs_for_object(obj)
+                obj.data.attributes.active_color = obj.data.attributes[FaceColorManager.ATTR_COLOR]
             context.scene.lv_vertex_color_show = True
 
         for area_iter in context.screen.areas:
@@ -1846,6 +1859,8 @@ class LVC_PT_LayerVertexColors(bpy.types.Panel):
         op.direction = 'UP'
         op = col.operator(LVC_OT_FaceColorSlotMove.bl_idname, text="", icon='TRIA_DOWN')
         op.direction = 'DOWN'
+        col.separator()
+        col.operator(LVC_OT_RebuildSlotData.bl_idname, text="", icon='FILE_REFRESH')
         col.separator()
         # 眼睛按钮：切换视图顶点色显示
         col.prop(context.scene, "lv_vertex_color_show", text="", icon='HIDE_OFF', toggle=True)
