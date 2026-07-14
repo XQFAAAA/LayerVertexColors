@@ -136,27 +136,39 @@ class FaceColorManager:
 
     @staticmethod
     def ensure_attrs_object(mesh):
-        """确保网格存在面颜色属性（对象模式）"""
+        """确保网格存在面颜色属性（对象模式）
+        返回 True 表示 color 属性被新建过
+        """
         attr_slot = FaceColorManager.ATTR_SLOT
         attr_color = FaceColorManager.ATTR_COLOR
         attr_hash = FaceColorManager.ATTR_HASH
+        created_color = False
         if mesh.attributes.get(attr_slot) is None:
             attr = mesh.attributes.new(attr_slot, 'INT', 'CORNER')
             for i in range(len(mesh.loops)):
                 attr.data[i].value = FaceColorManager.UNSET_SLOT
         if mesh.attributes.get(attr_color) is None:
-            mesh.attributes.new(attr_color, 'BYTE_COLOR', 'CORNER')
+            attr = mesh.attributes.new(attr_color, 'BYTE_COLOR', 'CORNER')
+            for i in range(len(mesh.loops)):
+                attr.data[i].color = FaceColorManager.DEFAULT_COLOR
+            created_color = True
         if mesh.attributes.get(attr_hash) is None:
             attr = mesh.attributes.new(attr_hash, 'STRING', 'CORNER')
             for i in range(len(mesh.loops)):
                 attr.data[i].value = b""
+        return created_color
 
     @staticmethod
     def ensure_attrs_for_object(obj):
-        """确保物体网格存在所有面颜色属性（对象模式）"""
+        """确保物体网格存在所有面颜色属性，若属性被新建则立即应用当前槽位颜色"""
         if obj.type != 'MESH':
             return
-        FaceColorManager.ensure_attrs_object(obj.data)
+        created = FaceColorManager.ensure_attrs_object(obj.data)
+        if created:
+            # 属性刚重建，将当前所有槽位的颜色同步到网格
+            data = obj.layer_vertex_colors
+            for i in range(len(data.slots)):
+                FaceColorManager.sync_color_for_slot(obj, i)
 
     @staticmethod
     def ensure_attrs_edit(bm):
@@ -1831,6 +1843,16 @@ class LVC_PT_LayerVertexColors(bpy.types.Panel):
         data = obj.layer_vertex_colors
         slots = data.slots
         active_idx = data.active_index
+
+        # ---- 缺少顶点色属性警告 ----
+        mesh = obj.data
+        if mesh.attributes.get(FaceColorManager.ATTR_SLOT) is None or \
+           mesh.attributes.get(FaceColorManager.ATTR_COLOR) is None:
+            row = layout.row(align=True)
+            row.alert = True
+            row.operator("lvcolor.rebuild_slot_data", text="Vertex color attribute missing, click to rebuild", icon='ERROR')
+            row.alert = False
+            layout.separator()
 
         # ---- 冲突警告 ----
         if FaceColorManager.has_slot_conflict(obj):
