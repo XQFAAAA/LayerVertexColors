@@ -4,7 +4,7 @@ bl_info = {
     "author": "xqfa",
     "description": "Layered vertex color management tool — independent color slot system",
     "blender": (4, 5, 0),
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "location": "View3D > Sidebar > LVC",
     "warning": "",
     "category": "Mesh",

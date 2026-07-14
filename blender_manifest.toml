@@ -1,7 +1,7 @@
-schema_version = "1.0.0"
+schema_version = "1.0.1"
 
 id = "layer_vertex_colors"
-version = "1.0.0"
+version = "1.0.1"
 name = "Layer Vertex Colors"
 tagline = "Layered vertex color slot system"
 maintainer = "xqfa"
